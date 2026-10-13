@@ -5,9 +5,9 @@ Agent-based demographic model of Mozambique built on [STIsim](https://github.com
 ## Repo layout
 
 - `model.py` — sim builder (`make_sim`); run as a script to simulate 1985–2030, save `results/sim.df`, and make figures
-- `analyzers.py` — `PregnancyByAge`: women, currently pregnant, new pregnancies, births, and parity by 5-year maternal age group
-- `plot_demographics.py` — population/fertility vs UN WPP (`figures/demographics.png`) and parity by age (`figures/parity.png`)
-- `data/` — UN WPP 2024 files for Mozambique: age distribution (1985), age-specific fertility, age/sex-specific mortality, total population
+- `analyzers.py` — `PregnancyByAge`: women, currently pregnant, new pregnancies, births, and parity by 5-year maternal age group; `AgePyramid`: population by sex and 5-year age group
+- `plot_demographics.py` — population/fertility vs UN WPP (`figures/demographics.png`), parity by age (`figures/parity.png`), and age pyramids by sex (`figures/age_pyramids.png`)
+- `data/` — UN WPP 2024 files for Mozambique: age distribution (1985), age-specific fertility, age/sex-specific mortality, total population, population by age and sex (1985–2025, every 10 years)
 
 ## Usage
 

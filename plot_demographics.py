@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import sciris as sc
 import matplotlib.pyplot as plt
-from analyzers import PregnancyByAge
+from analyzers import PregnancyByAge, AgePyramid
 
 pal = dict(model='#2a6fb0', model2='#8fb8de', data='k')
 
@@ -151,7 +151,45 @@ def plot_parity(df, filename='figures/parity.png', start_plot=2000, min_age=15):
     return fig
 
 
+def plot_pyramids(df, filename='figures/age_pyramids.png', years=(1985, 2005, 2025)):
+    """ Age pyramids by sex, model (bars) vs UN WPP (outline), as % of total population """
+    df = df.set_index('timevec')
+    an = AgePyramid()
+    labels, bins = an.labels, an.age_bins
+    data = pd.read_csv('data/mozambique_age_sex.csv')
+    data['group'] = pd.cut(data.AgeStart, bins, right=False, labels=labels)
+    data = data.groupby(['Time', 'Sex', 'group'], observed=False).Value.sum()
+    y = np.arange(len(labels))
+    sexes = dict(m=('Male', '#2a6fb0', -1), f=('Female', '#c2577a', 1))
+
+    fig, axes = plt.subplots(1, len(years), figsize=(5*len(years), 5), sharey=True)
+    for ax, yr in zip(axes, years):
+        model = {s: df.loc[yr, [f'agepyramid.{s}_{lb}' for lb in labels]].values for s in sexes}
+        mtot = sum(v.sum() for v in model.values())
+        dtot = data.loc[yr].sum()
+        for s, (name, color, sign) in sexes.items():
+            ax.barh(y, sign * model[s] / mtot * 100, height=0.85, color=color, alpha=0.8, label=f'{name} (model)')
+            d = data.loc[(yr, name)].values / dtot * 100
+            ax.plot(sign * np.repeat(d, 2), np.column_stack([y - 0.5, y + 0.5]).ravel(), color='k', lw=1.2,
+                    label='UN WPP' if s == 'f' else None)
+        lim = ax.get_xlim()
+        m = max(abs(lim[0]), abs(lim[1]))
+        ax.set_xlim(-m, m)
+        ticks = ax.get_xticks()
+        ax.set_xticks(ticks, [f'{abs(t):g}' for t in ticks])
+        ax.set_xlim(-m, m)
+        ax.set_title(str(yr))
+        ax.set_xlabel('% of population')
+        ax.spines[['top', 'right']].set_visible(False)
+    axes[0].set_yticks(y, labels)
+    axes[0].legend(frameon=False, fontsize=8, loc='upper left')
+    sc.figlayout()
+    sc.savefig(filename)
+    return fig
+
+
 if __name__ == '__main__':
     df = sc.loadobj('results/sim.df')
     plot_demographics(df)
     plot_parity(df)
+    plot_pyramids(df)

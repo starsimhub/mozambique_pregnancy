@@ -56,3 +56,27 @@ class PregnancyByAge(ss.Analyzer):
             for p, c in zip(self.parities, counts):
                 self.results[f'parity{p}_{lb}'][ti] = c
         return
+
+
+class AgePyramid(ss.Analyzer):
+    """ Population by sex and 5-year age group """
+
+    def __init__(self, age_bins=np.append(np.arange(0, 85, 5), 200), **kwargs):
+        super().__init__(**kwargs)
+        self.age_bins = age_bins
+        self.labels = [f'{a}-{b-1}' for a, b in zip(age_bins[:-2], age_bins[1:-1])] + [f'{age_bins[-2]}+']
+        return
+
+    def init_results(self):
+        super().init_results()
+        self.define_results(*[ss.Result(f'{sex}_{lb}', summarize_by='mean', scale=True) for sex in 'fm' for lb in self.labels])
+        return
+
+    def step(self):
+        ppl = self.sim.people
+        born = ppl.age >= 0
+        for sex, mask in zip('fm', [ppl.female, ppl.male]):
+            counts = np.histogram(ppl.age[born & mask], bins=self.age_bins)[0]
+            for lb, c in zip(self.labels, counts):
+                self.results[f'{sex}_{lb}'][self.ti] = c
+        return
