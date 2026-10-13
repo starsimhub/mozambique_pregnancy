@@ -94,6 +94,64 @@ def plot_demographics(df, filename='figures/demographics.png', asfr_years=(1985,
     return fig
 
 
+def plot_parity(df, filename='figures/parity.png', start_plot=2000, min_age=15):
+    """ Parity by age; dashed where the age group includes women older than min_age at sim start """
+    df = df.set_index('timevec').iloc[:-1]  # Drop final partial year
+    start = df.index.min()
+    df = df.loc[start_plot:]
+    yrs = df.index
+    an = PregnancyByAge()
+    labels, parities = an.labels, an.parities
+    uppers = an.age_bins[1:]
+    k = 'pregnancybyage'
+    agecols = plt.cm.Blues(np.linspace(0.35, 1, len(labels)))
+    parcols = plt.cm.Purples(np.linspace(0.15, 1, len(parities)))
+
+    def plot_split(ax, y, upper, color, label):
+        complete = (yrs - upper) >= (start - min_age)
+        ax.plot(yrs, np.where(complete, np.nan, y), color=color, lw=2, ls='--')
+        ax.plot(yrs, np.where(complete, y, np.nan), color=color, lw=2, label=label)
+        if complete.any():  # Join the dashed and solid segments
+            i = np.argmax(complete)
+            ax.plot(yrs[max(i-1, 0):i+1], y[max(i-1, 0):i+1], color=color, lw=2, ls='--')
+
+    fig, axes = plt.subplots(1, 3, figsize=(15, 4.5))
+
+    ax = axes[0]
+    for lb, ub, c in zip(labels, uppers, agecols):
+        plot_split(ax, df[f'{k}.mean_parity_{lb}'].values, ub, c, lb)
+    ax.set_title('Mean parity by age')
+    ax.set_ylim(bottom=0)
+    ax.legend(frameon=False, fontsize=8, ncol=2)
+
+    ax = axes[1]
+    yr = yrs.max()
+    dist = np.array([[df.loc[yr, f'{k}.parity{p}_{lb}'] for p in parities] for lb in labels])
+    dist = dist / dist.sum(axis=1, keepdims=True) * 100
+    bottom = np.zeros(len(labels))
+    for j, (p, c) in enumerate(zip(parities, parcols)):
+        ax.bar(labels, dist[:, j], bottom=bottom, color=c, edgecolor='white', lw=0.5, label=p)
+        bottom += dist[:, j]
+    ax.set_title(f'Parity distribution by age, {yr} (%)')
+    ax.set_xlabel('Age')
+    ax.legend(frameon=False, fontsize=8, title='Parity', title_fontsize=8, bbox_to_anchor=(1, 1), loc='upper left', reverse=True)
+
+    ax = axes[2]
+    for lb, ub, c in zip(labels, uppers, agecols):
+        y = df[f'{k}.parity0_{lb}'] / df[f'{k}.women_{lb}'] * 100
+        plot_split(ax, y.values, ub, c, lb)
+    ax.set_title('Nulliparous women by age (%)')
+    ax.set_ylim(bottom=0)
+    ax.legend(frameon=False, fontsize=8, ncol=2)
+
+    for ax in axes:
+        ax.spines[['top', 'right']].set_visible(False)
+    sc.figlayout()
+    sc.savefig(filename)
+    return fig
+
+
 if __name__ == '__main__':
     df = sc.loadobj('results/sim.df')
     plot_demographics(df)
+    plot_parity(df)
