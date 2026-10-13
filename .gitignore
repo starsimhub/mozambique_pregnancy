@@ -3,3 +3,4 @@ __pycache__/
 raw_results/
 .DS_Store
 auth_key.txt
+results/
