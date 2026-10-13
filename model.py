@@ -4,6 +4,7 @@ Create Mozambique demographic model
 
 import sciris as sc
 import stisim as sti
+from analyzers import PregnancyByAge
 
 
 def make_sim(seed=1, start=1985, stop=2030, n_agents=10e3, verbose=1/12):
@@ -14,13 +15,16 @@ def make_sim(seed=1, start=1985, stop=2030, n_agents=10e3, verbose=1/12):
         datafolder='data/',
         demographics='mozambique',
         rand_seed=seed,
+        analyzers=PregnancyByAge(),
         verbose=verbose,
     )
     return sim
 
 
 if __name__ == '__main__':
+    from plot_demographics import plot_demographics
     sim = make_sim()
     sim.run()
-    sim.plot()
-    sc.savefig('figures/demographics.png')
+    df = sim.to_df(resample='year', use_years=True, sep='.')
+    sc.saveobj('results/sim.df', df)
+    plot_demographics(df)
