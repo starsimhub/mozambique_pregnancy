@@ -147,11 +147,11 @@ pytest in `tests/`:
 - Antibodies block placental establishment only; they do not shorten placental infections. Candidate addition if chronic-class prevalence by gravidity will not fit.
 - Placental infection does not feed back into transmission.
 - No postpartum parasite release.
+- No link from `ab` to anti-VAR2CSA IgG titre (out of scope, decided 2026-10-14). Adding one would let published titres by gravidity pin the scale of `ab` and resolve the `boost`/`ab50` ridge.
 
 ## Open questions
 
 - Shape of the `Scenarios` API: how a scenario is specified
 - Miscarriage/stillbirth hook in v4 `ss.Pregnancy`
-- Whether to add a link from `ab` to anti-VAR2CSA IgG titre so published titres by gravidity can be a target (would pin the scale of `ab` and resolve the `boost`/`ab50` ridge)
 - Whether to model postpartum parasite release
 - Final malaria `dt` (benchmark)
