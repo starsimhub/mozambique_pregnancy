@@ -43,42 +43,47 @@ Humans S → E → I → R → S; mosquitoes `null` → Sv → Ev → Iv → `nu
 - `infection: Sh >> Eh @ a·b·Iv.n/Nh`, `latency: Eh >> Ih @ ss.days(12)`, `recovery: Ih >> Rh @ ss.days(dur_inf)`, `waning: Rh >> Sh @ ss.days(dur_imm)`
 - `emergence: null >> Sv @ intensity · base_emergence · seasonal(t)`, `biting: Sv >> Ev @ a·c·Ih.n/Nh`, `incubation: Ev >> Iv @ ss.days(10)`, `mortality: (Sv|Ev|Iv) >> null @ ss.days(10)`
 - `seasonal`: `ss.timeseries(mode='cosine', period=ss.years(1))`, peak in February–March (rainy season November–April)
-- Pregnancy raises susceptibility: `ss.modify(malaria.rel_sus, multiply=rr_preg, where=pregnancy.pregnant)`
+- Pregnancy raises susceptibility: `ss.modify(malaria.rel_sus, multiply=rr_preg, where=pregnancy.pregnant)`. This is a reduced-form stand-in for higher peripheral parasitaemia in pregnancy (attractiveness to *Anopheles*, and seeding of the periphery from the placenta), not a mechanism; it does not raise onward transmission, and must not double-count the placental niche
 - **Every rate carries a unit** (`ss.perday`, `ss.days`). A bare number takes the sim's unit; with a monthly sim this made transmission ~30× too low and malaria died out in the prototype.
 
-Human infectiousness depends on peripheral infection only.
+Human infectiousness depends on peripheral infection only. Placental infection never feeds back into transmission, so no intervention can act through that route.
 
 ### `placental` (connector)
 
 States per woman:
 
-- `ab` (float, 0–1): VAR2CSA antibody level
-- `plac` (int): 0 none, 1 acute (parasites, no pigment), 2 chronic (parasites + pigment), 3 past (pigment only)
-- `ti_plac`: time placental infection began
-- `dur_plac_inf`, `dur_plac_chronic` (float): accumulated time in acute+chronic and in chronic during this pregnancy (stage 2 uses these)
+- `ab` (float, 0–1): VAR2CSA antibody level (latent; never observed directly)
+- `parasites` (bool): placental parasites present
+- `pigment` (bool): haemozoin in placental tissue; once set, never reverts within a pregnancy
+- `ti_parasites`: time the current placental infection began
+- `dur_parasites`, `dur_parasites_pigment` (float): accumulated time with parasites, and with parasites plus pigment, this pregnancy (stage 2 harm uses these, not the histology label)
+
+Histology class is derived, not stored: none (neither), acute (parasites, no pigment), chronic (parasites and pigment), past (pigment only). A re-infection over old pigment is therefore chronic.
 
 Each step, among pregnant women:
 
-1. **New infection → placental?** Newly infected pregnant women with `plac ∈ {0, 3}` (none or past) become acute with probability `p0 / (1 + (ab/ab50)^h)`.
-2. **Progression.** Acute → chronic after `t_chronic`. Acute/chronic → past at rate `1/dur_plac` (untreated clearance, months), **independent of peripheral recovery**: placental infection can persist with a negative peripheral smear.
-3. **Boost.** On becoming placentally infected: `ab += boost · (1 − ab)`. On a new infection during pregnancy that does not become placental: `ab += f · boost · (1 − ab)`. `f = 0` gives the placental-only variant.
-4. **Waning.** All women: `ab *= exp(−ln2 · dt / ab_halflife)`.
-5. **Delivery** (Pregnancy delivery callback): record `plac` as the histology class at delivery, then reset `plac`, `ti_plac`, and durations. Stage 3 adds the newborn transfer here: `ab_newborn = ab · eff_transfer · (1 − imp_transfer · [plac ∈ {1, 2}])`.
+1. **New infection → placental?** Newly infected pregnant women with gestation ≥ `ga_plac` (~13 weeks; no placental surface before) and no current placental parasites establish placental infection with probability `p0 / (1 + (ab/ab50)^h)`.
+2. **Pigment.** Set after `t_chronic` of continuous placental parasites.
+3. **Clearance.** Placental parasites clear at rate `1/dur_plac` (untreated, months), **independent of peripheral recovery**: placental infection can persist with a negative peripheral smear.
+4. **Boost.** On establishing placental infection: `ab += boost · (1 − ab)`. On a new infection during pregnancy that does not establish placentally: `ab += f · boost · (1 − ab)`. `f = 0` gives the placental-only variant.
+5. **Waning.** All women: `ab *= exp(−ln2 · dt / ab_halflife)`.
+6. **Delivery** (Pregnancy delivery callback): record the histology class at delivery, then reset the placental states. Stage 3 adds the newborn transfer here: `ab_newborn = ab · eff_transfer · (1 − imp_transfer · parasites)`.
 
-**Initial antibody.** At malaria start, set each woman's `ab` by applying the boost/wane rules over her `n_pregnancies` past pregnancies, with the per-pregnancy probability of placental infection taken from a scenario-level par `p_plac_past` (and peripheral-only infection `p_inf_past`). These are calibrated per intensity level so that `ab` by age is stationary across the malaria burn-in.
+`clear_placental(uids)` sets `parasites = False` and leaves `pigment` (acute → none, chronic → past). This is the hook for treatment and IPTp in stage 4; placental clearance by drugs is less reliable than peripheral, so stage 4 uses its own efficacy.
 
-Postpartum parasite release at delivery is out of scope for stage 1.
+**Initial antibody.** At malaria start, replay each woman's `n_pregnancies` past pregnancies with a per-pregnancy infection probability `q_past` (one constant per intensity level) and the birth interval implied by her age and gravidity. Each infected past pregnancy goes through the same Hill function with her running `ab`, then boost and wane. Calibrate `q_past` per intensity so that `ab` by age at malaria start matches `ab` by age after the burn-in.
 
 ### `outcomes` (connector, stage 2 interface only)
 
-Harm accrues with exposure and does not reverse when infection clears. For outcome *k*:
+Harm accrues with exposure and does not reverse when infection clears.
 
-- Growth restriction: per-step penalty to `FetalHealth.apply_growth_restriction` while `plac ∈ {1, 2}`, larger in chronic (`gr_acute`, `gr_chronic`)
-- Preterm: `FetalHealth.apply_timing_shift` with probability depending on placental history
-- Stillbirth/miscarriage: via `ss.Pregnancy` (hook to be confirmed)
-- Maternal anaemia: state on the mother, driven by peripheral and placental infection, flatter across gravidity
+- **Growth restriction:** per-step penalty to `FetalHealth.apply_growth_restriction` while placental parasites are present, larger with pigment (`gr_acute`, `gr_chronic`). Steepest gravidity gradient.
+- **Preterm birth:** mainly from peripheral (febrile) episodes, with a smaller placental term, via `FetalHealth.apply_timing_shift`. Stage 1's SEIRS has no clinical state, so peripheral infection is the proxy until one is added.
+- **Miscarriage:** from peripheral infection only. It is mostly first-trimester, before placental infection can establish (`ga_plac`), and is driven by systemic illness. Hook into `ss.Pregnancy` to be confirmed.
+- **Stillbirth:** from placental and peripheral infection.
+- **Maternal anaemia:** state on the mother, driven by peripheral and placental infection; flattest across gravidity.
 
-Shapes differ by outcome (growth restriction steepest first-pregnancy effect, preterm intermediate, anaemia near-flat), which comes from each outcome having its own dependence on placental history rather than one curve.
+The flatter gradients for preterm birth and anaemia emerge from their dependence on peripheral infection, rather than being imposed per outcome.
 
 ### `Scenarios` (container, prototype)
 
@@ -98,33 +103,55 @@ Verified in v4 prototypes: continuation after save/load is bit-identical to an u
 | `a`, `b`, `c` | 0.3/day, 0.5, 0.5 | Ross-Macdonald |
 | `dur_inf`, `dur_imm` | 100 d, 365 d | Untreated infection, temporary immunity |
 | `intensity` | low / moderate / high | Calibrated to MAP *Pf*PR₂₋₁₀ ranges for Mozambique |
-| `rr_preg` | 1.5–2 | Pregnant women more attractive to *Anopheles* |
-| `p0`, `ab50`, `h` | 0.7, 0.3, 2 | Placental establishment vs antibody |
-| `boost`, `f` | 0.5, 0.15 (0–0.2) | Graded boost; `f = 0` switch |
-| `ab_halflife` | 3 y | Waning between pregnancies |
-| `t_chronic` | 6 weeks | Acute → chronic (pigment) |
+| `rr_preg` | 1.5–2 | Reduced-form; see `Malaria` |
+| `p0`, `ab50` | 0.7, 0.3 | Placental establishment vs antibody |
+| `h` | 2 (fixed) | Fixed to limit the `boost`/`ab50` ridge |
+| `boost` | 0.4 (0.3–0.5) | Per infection |
+| `f` | 0.15 (fixed; 0 as switch) | Boost from non-placental infection in pregnancy |
+| `ab_halflife` | 8 y (6–10) | Waning between pregnancies; strongest control on the gradient |
+| `ga_plac` | 13 weeks | Earliest placental establishment |
+| `t_chronic` | 6 weeks | Parasites → pigment |
 | `dur_plac` | 90 d | Untreated placental clearance |
 | `p_loss` | 0.15 | Pregnancies not ending in birth, for initial gravidity |
+
+**Joint calibration.** `p0`, `boost`, `ab50`, `ab_halflife` and the force of infection act on one observable (the gravidity gradient) and cannot have independent priors. A per-woman Monte Carlo of the mechanism (one infection per pregnancy, 3-year birth interval) gives G2/G1 and G3/G1 of 0.71 and 0.67 with a 3-year half-life and `boost = 0.5`; reaching the observed ≈ 0.6 and 0.4 needs a half-life of 6–10 years with `boost` 0.3–0.5. At high intensity, multiple infections per pregnancy raise the effective per-pregnancy boost and push G1 towards saturation, so the per-infection values come out of calibration, not literature.
+
+**Identifiability.** `ab` is latent and the targets are parasitaemia and histology. Expect a ridge between `boost` and `ab50`, broken only weakly by the `1 − ab` saturation. Fix `h` and `f`; calibrate `p0`, `boost`, `ab50`, `ab_halflife` jointly and check for the ridge.
 
 ## Testing
 
 pytest in `tests/`:
 
 - Boost/wane arithmetic; `p_plac` decreases monotonically with `ab`
-- Unit consistency: `Malaria` gives the same results in a sim with a monthly unit and one with a daily unit
-- Initial `n_pregnancies` matches cumulative ASFR × (1 + `p_loss`) by age
+- **Null gradient:** with `boost = 0` and `f = 0`, placental infection is flat across gravidity (the gradient must come from antibodies, not from age/parity structure)
+- **Gradient check:** the mechanism alone (no transmission model) reproduces the Monte Carlo gradients above
+- Longer `ab_halflife` gives a steeper gradient
+- **Birth interval:** at fixed gravidity, longer intervals give lower `ab` (the mechanism behind the fertility-transition result)
+- Pigment never reverts within a pregnancy; `clear_placental` maps acute → none and chronic → past
+- No placental infection before `ga_plac`
 - Placental clearance is independent of peripheral recovery
+- **Initial antibody:** `ab` by age at malaria start ≈ `ab` by age after the burn-in
+- Initial `n_pregnancies` matches cumulative ASFR × (1 + `p_loss`) by age
+- Unit consistency: `Malaria` epi outputs agree within tolerance between a sim with a monthly unit and one with a daily unit
 - Branching: continued run equals uninterrupted; a parameter change after load takes effect
 - `sim.check_dt(factor=2)`: daily vs 2-day malaria
 - Speed benchmark: 10k agents, 1985 monthly demography → 10-y malaria burn-in → 5-y projection; decides 1- vs 2-day `dt`
 
-**Stage 1 success:** placental infection prevalence at delivery is clearly higher in first than later pregnancies at high intensity; the gradient is smaller at low intensity; the projection step is fast enough for hundreds of scenarios.
+**Stage 1 success:** the 4-class histology distribution at delivery (none / acute / chronic / past) differs by gravidity in the observed direction at high intensity, within age bands, and the gradient is smaller at low intensity. Comparisons average over enough years that conception-month composition (seasonality × gestation) does not drive them. The projection step is fast enough for hundreds of scenarios.
 
-**Calibration targets (later stages):** *Pf*PR₂₋₁₀ per intensity; peripheral parasitaemia at first ANC by gravidity (Mozambique ANC surveillance); placental histology class by gravidity (e.g. Manhiça cohorts; Desai et al. 2007). Age-specific prevalence in children will not fit until stage 3 adds age-acquired immunity.
+**Calibration targets (later stages):** *Pf*PR₂₋₁₀ per intensity; peripheral parasitaemia at first ANC by gravidity (Mozambique ANC surveillance); placental histology class by gravidity and age (e.g. Manhiça cohorts; Desai et al. 2007), using HIV-negative strata where reported. Age-specific prevalence in children will not fit until stage 3 adds age-acquired immunity.
+
+## Limitations
+
+- **No HIV.** HIV attenuates gravidity-dependent protection (HIV-positive multigravidae resemble primigravidae), and Mozambique and the Manhiça cohorts have high HIV prevalence. Fitting without HIV biases `boost` low; prefer HIV-negative strata.
+- Antibodies block placental establishment only; they do not shorten placental infections. Candidate addition if chronic-class prevalence by gravidity will not fit.
+- Placental infection does not feed back into transmission.
+- No postpartum parasite release.
 
 ## Open questions
 
 - Shape of the `Scenarios` API: how a scenario is specified
-- Stillbirth/miscarriage hook in v4 `ss.Pregnancy`
+- Miscarriage/stillbirth hook in v4 `ss.Pregnancy`
+- Whether to add a link from `ab` to anti-VAR2CSA IgG titre so published titres by gravidity can be a target (would pin the scale of `ab` and resolve the `boost`/`ab50` ridge)
 - Whether to model postpartum parasite release
 - Final malaria `dt` (benchmark)
