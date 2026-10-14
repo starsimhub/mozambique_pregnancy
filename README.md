@@ -1,6 +1,10 @@
 # mozambique_pregnancy
 
-Agent-based demographic model of Mozambique built on [STIsim](https://github.com/starsimhub/stisim) / [Starsim](https://github.com/starsimhub/starsim): births via `ss.Pregnancy`, background deaths, and UN WPP age structure. No diseases yet.
+Agent-based model of malaria in pregnancy in Mozambique, built on [STIsim](https://github.com/starsimhub/stisim) / [Starsim](https://github.com/starsimhub/starsim).
+
+The motivating question is how malaria immunity in pregnancy depends on reproductive history. Women acquire antibodies against placental malaria with successive pregnancies, so first-time mothers are most vulnerable and protection rises with each pregnancy. Capturing this requires a realistic distribution of pregnancies by age and over time, which this model provides as a first step.
+
+**Status:** demographics only — births via `ss.Pregnancy`, background deaths, and UN WPP age structure, compared against WPP. Malaria and immunity are not yet included.
 
 ## Repo layout
 
