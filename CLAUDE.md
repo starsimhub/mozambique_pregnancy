@@ -19,6 +19,7 @@ Malaria-in-pregnancy ABM for Mozambique on starsim v4. Read `README.md` and the 
 - `ss.Pregnancy` and `FetalHealth` are agent-only: use `solver='abm'`.
 - **Bare-number rates take the sim's time unit** — always type rates (`ss.perday`, `ss.days`).
 - Modules can have their own `dt` and `start`; `Disease.dt` cannot be changed after a run starts.
+- Branch probability `p` can be a function of the sim returning per-agent values (used for `p_clin · rel_sev`). State objects from `ss.states()` belong to one disease; make fresh ones per disease (`E206`).
 - `sim.run(until=...)` + `sim.save()` + `sc.load()` continues bit-identically; parameter changes after load take effect; setting `rand_seed` after load is ignored (by design: one seed per sim).
 
 ## Conventions
