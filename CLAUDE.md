@@ -2,10 +2,11 @@
 
 Malaria-in-pregnancy ABM for Mozambique on starsim v4. Read `README.md` and the design spec first.
 
-## State (paused 2026-10-14)
+## State (2026-10-15)
 
 - **Done:** demographics-only sim (`model.py`, still on `sti.Sim`), `analyzers.py` (`PregnancyByAge`, `AgePyramid`), `plot_demographics.py`, WPP data in `data/`.
-- **Design:** `docs/superpowers/specs/2026-10-14-malaria-in-pregnancy-design.md` — stage 1 spec, revised after external review. Awaiting the user's final approval.
+- **Design:** `docs/superpowers/specs/2026-10-14-malaria-in-pregnancy-design.md` — stage 1 spec, revised after external review and again to the full project scope (6 stages; general immunity as `rel_sev`). Awaiting the user's final approval.
+- **Project scope:** concept memo at `docs/Malaria_and_Pregnancy_Draft_Concept.docx` — **private, never commit** (git-excluded via `.git/info/exclude`).
 - **Next:** confirm approval, then write the stage-1 implementation plan (superpowers:writing-plans). No malaria code exists yet.
 
 ## Environment
@@ -22,6 +23,6 @@ Malaria-in-pregnancy ABM for Mozambique on starsim v4. Read `README.md` and the 
 
 ## Conventions
 
-- Names terse, starsim-style: `Malaria` (module), `placental`, `outcomes` (connectors), `Scenarios` (container).
+- Names terse, starsim-style: `Malaria` (module), `placental`, `outcomes`, `anc` (connectors/interventions), `Scenarios` (container).
 - Burn in once (K seeds per intensity), branch many scenarios from the saved burn-ins.
 - Don't push without asking.
